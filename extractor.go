@@ -50,13 +50,19 @@ func NewExtractor(config Configuration) ContentExtractor {
 	}
 }
 
-//if the article has a title set in the source, use that
+// if the article has a title set in the source, use that
 func (extr *ContentExtractor) getTitleUnmodified(document *goquery.Document) string {
 	title := ""
 
 	titleElement := document.Find("title")
 	if titleElement != nil && titleElement.Size() > 0 {
-		title = titleElement.Text()
+		titleText := ""
+		titleElement.Each(func(i int, s *goquery.Selection) {
+			if len(s.Text()) > len(titleText) {
+				titleText = s.Text()
+			}
+		})
+		title = titleText
 	}
 
 	if title == "" {
@@ -366,9 +372,9 @@ func (extr *ContentExtractor) GetCleanTextAndLinks(topNode *goquery.Selection, l
 }
 
 // CalculateBestNode checks for the HTML node most likely to contain the main content.
-//we're going to start looking for where the clusters of paragraphs are. We'll score a cluster based on the number of stopwords
-//and the number of consecutive paragraphs together, which should form the cluster of text that this node is around
-//also store on how high up the paragraphs are, comments are usually at the bottom and should get a lower score
+// we're going to start looking for where the clusters of paragraphs are. We'll score a cluster based on the number of stopwords
+// and the number of consecutive paragraphs together, which should form the cluster of text that this node is around
+// also store on how high up the paragraphs are, comments are usually at the bottom and should get a lower score
 func (extr *ContentExtractor) CalculateBestNode(document *goquery.Document) *goquery.Selection {
 	var topNode *goquery.Selection
 	nodesToCheck := extr.nodesToCheck(document)
@@ -460,7 +466,7 @@ func (extr *ContentExtractor) CalculateBestNode(document *goquery.Document) *goq
 	return topNode
 }
 
-//returns the gravityScore as an integer from this node
+// returns the gravityScore as an integer from this node
 func (extr *ContentExtractor) getScore(node *goquery.Selection) int {
 	return extr.getNodeGravityScore(node)
 }
@@ -477,8 +483,8 @@ func (extr *ContentExtractor) getNodeGravityScore(node *goquery.Selection) int {
 	return grvScore
 }
 
-//adds a score to the gravityScore Attribute we put on divs
-//we'll get the current score then add the score we're passing in to the current
+// adds a score to the gravityScore Attribute we put on divs
+// we'll get the current score then add the score we're passing in to the current
 func (extr *ContentExtractor) updateScore(node *goquery.Selection, addToScore int) {
 	currentScore := 0
 	var err error
@@ -493,7 +499,7 @@ func (extr *ContentExtractor) updateScore(node *goquery.Selection, addToScore in
 	extr.config.parser.setAttr(node, "gravityScore", strconv.Itoa(newScore))
 }
 
-//stores how many decent nodes are under a parent node
+// stores how many decent nodes are under a parent node
 func (extr *ContentExtractor) updateNodeCount(node *goquery.Selection, addToCount int) {
 	currentScore := 0
 	var err error
@@ -508,9 +514,9 @@ func (extr *ContentExtractor) updateNodeCount(node *goquery.Selection, addToCoun
 	extr.config.parser.setAttr(node, "gravityNodes", strconv.Itoa(newScore))
 }
 
-//a lot of times the first paragraph might be the caption under an image so we'll want to make sure if we're going to
-//boost a parent node that it should be connected to other paragraphs, at least for the first n paragraphs
-//so we'll want to make sure that the next sibling is a paragraph and has at least some substantial weight to it
+// a lot of times the first paragraph might be the caption under an image so we'll want to make sure if we're going to
+// boost a parent node that it should be connected to other paragraphs, at least for the first n paragraphs
+// so we'll want to make sure that the next sibling is a paragraph and has at least some substantial weight to it
 func (extr *ContentExtractor) isBoostable(node *goquery.Selection) bool {
 	stepsAway := 0
 	next := node.Next()
@@ -541,7 +547,7 @@ func (extr *ContentExtractor) isBoostable(node *goquery.Selection) bool {
 	return false
 }
 
-//returns a list of nodes we want to search on like paragraphs and tables
+// returns a list of nodes we want to search on like paragraphs and tables
 func (extr *ContentExtractor) nodesToCheck(doc *goquery.Document) []*goquery.Selection {
 	var output []*goquery.Selection
 	tags := []string{"p", "pre", "td"}
@@ -556,8 +562,8 @@ func (extr *ContentExtractor) nodesToCheck(doc *goquery.Document) []*goquery.Sel
 	return output
 }
 
-//checks the density of links within a node, is there not much text and most of it contains bad links?
-//if so it's no good
+// checks the density of links within a node, is there not much text and most of it contains bad links?
+// if so it's no good
 func (extr *ContentExtractor) isHighLinkDensity(node *goquery.Selection) bool {
 	links := node.Find("a")
 	if links == nil || links.Size() == 0 {
@@ -621,10 +627,10 @@ func (extr *ContentExtractor) isNodescoreThresholdMet(node *goquery.Selection, e
 	return true
 }
 
-//we could have long articles that have tons of paragraphs so if we tried to calculate the base score against
-//the total text score of those paragraphs it would be unfair. So we need to normalize the score based on the average scoring
-//of the paragraphs within the top node. For example if our total score of 10 paragraphs was 1000 but each had an average value of
-//100 then 100 should be our base.
+// we could have long articles that have tons of paragraphs so if we tried to calculate the base score against
+// the total text score of those paragraphs it would be unfair. So we need to normalize the score based on the average scoring
+// of the paragraphs within the top node. For example if our total score of 10 paragraphs was 1000 but each had an average value of
+// 100 then 100 should be our base.
 func (extr *ContentExtractor) getSiblingsScore(topNode *goquery.Selection) int {
 	base := 100000
 	paragraphNumber := 0
@@ -689,7 +695,7 @@ func (extr *ContentExtractor) walkSiblings(node *goquery.Selection) []*goquery.S
 	return b
 }
 
-//adds any siblings that may have a decent score to this node
+// adds any siblings that may have a decent score to this node
 func (extr *ContentExtractor) addSiblings(topNode *goquery.Selection) *goquery.Selection {
 	if extr.config.debug {
 		log.Println("Starting to add siblings")
@@ -710,7 +716,7 @@ func (extr *ContentExtractor) addSiblings(topNode *goquery.Selection) *goquery.S
 	return topNode
 }
 
-//PostCleanup removes any divs that looks like non-content, clusters of links, or paras with no gusto
+// PostCleanup removes any divs that looks like non-content, clusters of links, or paras with no gusto
 func (extr *ContentExtractor) PostCleanup(targetNode *goquery.Selection) *goquery.Selection {
 	if extr.config.debug {
 		log.Println("Starting cleanup Node")
